@@ -6,7 +6,6 @@ import mimetypes
 import os
 import re
 import shutil
-import subprocess
 import sys
 import webbrowser
 from collections.abc import Mapping
