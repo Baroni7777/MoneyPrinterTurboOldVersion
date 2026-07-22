@@ -1,6 +1,5 @@
 x-common-volumes: &common-volumes
   - ./:/MoneyPrinterTurbo
-  - ./config.example.toml:/MoneyPrinterTurbo/config.toml
 
 services:
   webui:

@@ -1,5 +1,4 @@
 import os
-import shutil
 import socket
 import tempfile
 import threading
@@ -299,23 +298,31 @@ def get_default_ollama_base_url() -> str:
 
 
 def load_config():
-    # fix: IsADirectoryError: [Errno 21] Is a directory: '/MoneyPrinterTurbo/config.toml'
+    example_file = f"{root_dir}/config.example.toml"
     if os.path.isdir(config_file):
-        shutil.rmtree(config_file)
+        # A bind mount can appear as a directory when the host-side source
+        # file is missing. Never remove it: Docker mounts are not removable
+        # from inside the container and rmtree raises EBUSY.
+        logger.warning(
+            f"config path is a directory or mount, loading fallback: {config_file}"
+        )
+        config_file_to_load = example_file
+    elif not os.path.isfile(config_file):
+        config_file_to_load = example_file
+    else:
+        config_file_to_load = config_file
 
-    if not os.path.isfile(config_file):
-        example_file = f"{root_dir}/config.example.toml"
-        if os.path.isfile(example_file):
-            shutil.copyfile(example_file, config_file)
-            logger.info("copy config.example.toml to config.toml")
+    if not os.path.isfile(config_file_to_load):
+        logger.warning(f"config file not found: {config_file_to_load}")
+        return {}
 
-    logger.info(f"load config from file: {config_file}")
+    logger.info(f"load config from file: {config_file_to_load}")
 
     try:
-        _config_ = toml.load(config_file)
+        _config_ = toml.load(config_file_to_load)
     except Exception as e:
         logger.warning(f"load config failed: {str(e)}, try to load as utf-8-sig")
-        with open(config_file, mode="r", encoding="utf-8-sig") as fp:
+        with open(config_file_to_load, mode="r", encoding="utf-8-sig") as fp:
             _cfg_content = fp.read()
             _config_ = toml.loads(_cfg_content)
     return _config_
