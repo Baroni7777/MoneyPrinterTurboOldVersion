@@ -74,7 +74,11 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Trigger Coolify deployment after image publish
-        if: ${{ success() && secrets.COOLIFY_DEPLOY_WEBHOOK != '' }}
         env:
           COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
-        run: curl --fail --silent --show-error --retry 3 -X POST "$COOLIFY_DEPLOY_WEBHOOK"
+        run: |
+          if [ -n "$COOLIFY_DEPLOY_WEBHOOK" ]; then
+            curl --fail --silent --show-error --retry 3 -X POST "$COOLIFY_DEPLOY_WEBHOOK"
+          else
+            echo "COOLIFY_DEPLOY_WEBHOOK is not configured; skipping deployment trigger."
+          fi
