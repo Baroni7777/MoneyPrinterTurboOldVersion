@@ -255,9 +255,9 @@ cd MoneyPrinterTurbo
 docker compose -f docker-compose.release.yml up
 ```
 
-> The recommended default is `docker-compose.release.yml`, which pulls the prebuilt image from GitHub Container Registry: `ghcr.io/harry0703/moneyprinterturbo:latest`.
-> If you need to build the image locally, you can still run `docker compose up`.
-> Before the first start, copy `config.example.toml` to `config.toml` so it can be mounted into the containers.
+> The recommended default is `docker-compose.release.yml`, which pulls the prebuilt image from this repository's GitHub Container Registry package: `ghcr.io/baroni7777/moneyprinterturbo-old-version:latest`.
+> If you need to build the image locally, use `docker compose up`.
+> Configure deployment credentials through Coolify environment variables; `config.example.toml` remains the local fallback.
 
 #### ② Access the WebUI
 

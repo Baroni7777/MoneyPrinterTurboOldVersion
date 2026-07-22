@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: ghcr.io/harry0703/moneyprinterturbo
+  IMAGE_NAME: ghcr.io/baroni7777/moneyprinterturbo-old-version
 
 jobs:
   publish:
@@ -56,6 +56,7 @@ jobs:
             type=ref,event=tag
             type=semver,pattern={{version}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=sha-
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -71,3 +72,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Trigger Coolify deployment after image publish
+        if: ${{ success() && secrets.COOLIFY_DEPLOY_WEBHOOK != '' }}
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+        run: curl --fail --silent --show-error --retry 3 -X POST "$COOLIFY_DEPLOY_WEBHOOK"

@@ -3,9 +3,8 @@ x-common-volumes: &common-volumes
 
 services:
   webui:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/baroni7777/moneyprinterturbo-old-version:latest
+    pull_policy: always
     container_name: "moneyprinterturbo-webui"
     ports:
       - "127.0.0.1:8501:8501"
@@ -13,9 +12,8 @@ services:
     volumes: *common-volumes
     restart: always
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/baroni7777/moneyprinterturbo-old-version:latest
+    pull_policy: always
     container_name: "moneyprinterturbo-api"
     ports:
       - "127.0.0.1:8082:8080"
