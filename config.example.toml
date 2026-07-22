@@ -1,6 +1,7 @@
 # MoneyPrinterTurbo configuration example.
 # The app copies this file to config.toml on first run. Keep API keys and other
-# credentials in config.toml; do not commit your local config.toml.
+# credentials in config.toml or, preferably for deployments, environment
+# variables using the MPT_<SECTION>_<KEY> convention documented in .env.example.
 
 # =============================================================================
 # API Service / API 服务

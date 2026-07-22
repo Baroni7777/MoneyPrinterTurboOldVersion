@@ -12,6 +12,7 @@ import webbrowser
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 from uuid import UUID, uuid4
 
 import requests
@@ -580,7 +581,7 @@ def _open_task_path(task_path):
         webbrowser.open(f"file://{normalized_path}")
 
 
-def _open_task_video(video_file):
+def _task_video_url(video_file):
     tasks_root = os.path.abspath(utils.task_dir())
     normalized_file = os.path.abspath(video_file)
 
@@ -588,20 +589,35 @@ def _open_task_video(video_file):
     # 内的文件，避免 UI 操作被异常路径扩展成任意本地文件打开能力。
     if not normalized_file.startswith(tasks_root + os.sep):
         logger.warning(f"invalid task video path: {normalized_file}")
-        return
+        return ""
     if not os.path.isfile(normalized_file):
         logger.warning(f"task video does not exist: {normalized_file}")
-        return
+        return ""
 
-    try:
-        if sys.platform == "darwin":
-            subprocess.Popen(["open", normalized_file])
-        elif sys.platform.startswith("win"):
-            os.startfile(normalized_file)  # type: ignore[attr-defined]
-        else:
-            subprocess.Popen(["xdg-open", normalized_file])
-    except Exception as e:
-        logger.error(f"failed to open task video: {normalized_file}, {e}")
+    endpoint = str(config.app.get("endpoint") or "").strip().rstrip("/")
+    if not endpoint:
+        endpoint = (
+            os.getenv("MPT_PUBLIC_ENDPOINT")
+            or os.getenv("SERVICE_FQDN_API")
+            or os.getenv("SERVICE_URL_API")
+            or ""
+        ).strip().rstrip("/")
+    if endpoint and "://" not in endpoint:
+        endpoint = f"https://{endpoint}"
+    if not endpoint:
+        logger.warning("cannot build task video URL: public API endpoint is not configured")
+        return ""
+
+    relative_file = os.path.relpath(normalized_file, tasks_root).replace(os.sep, "/")
+    encoded_path = "/".join(quote(part) for part in relative_file.split("/"))
+    return f"{endpoint}/tasks/{encoded_path}"
+
+
+def _open_task_video(video_file):
+    video_url = _task_video_url(video_file)
+    if video_url:
+        st.session_state["selected_task_video_url"] = video_url
+    return video_url
 
 
 def _delete_task(task_id, task_path, task_state=None):
@@ -763,6 +779,10 @@ def _render_task_table(filtered_tasks, key_prefix):
                             st.rerun()
                         else:
                             st.error(tr("Task Delete Failed"))
+
+    selected_video_url = st.session_state.get("selected_task_video_url", "")
+    if selected_video_url:
+        st.video(selected_video_url)
 
 
 def _render_task_manager_panel(tasks=None):

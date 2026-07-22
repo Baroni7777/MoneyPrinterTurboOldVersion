@@ -1,5 +1,6 @@
 import threading
 import tomllib
+import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -55,6 +56,32 @@ class TestConfigPersistence:
 
         assert upload_post_keys <= example_config["app"].keys()
         assert upload_post_keys.isdisjoint(example_config.get("ui", {}).keys())
+
+    def test_environment_overrides_are_typed_and_empty_values_fallback(self):
+        values = {
+            "log_level": "DEBUG",
+            "app": {
+                "endpoint": "https://from-config.example",
+                "enable_redis": False,
+                "upload_post_platforms": ["tiktok"],
+            },
+        }
+        with patch.dict(
+            os.environ,
+            {
+                "MPT_LOG_LEVEL": "INFO",
+                "MPT_APP_ENDPOINT": "https://from-env.example",
+                "MPT_APP_ENABLE_REDIS": "true",
+                "MPT_APP_UPLOAD_POST_PLATFORMS": '["youtube"]',
+            },
+            clear=False,
+        ):
+            overridden = config._apply_environment_overrides(values)
+
+        assert overridden["log_level"] == "INFO"
+        assert overridden["app"]["endpoint"] == "https://from-env.example"
+        assert overridden["app"]["enable_redis"] is True
+        assert overridden["app"]["upload_post_platforms"] == ["youtube"]
 
     def test_save_config_uses_parseable_atomic_output(self):
         """

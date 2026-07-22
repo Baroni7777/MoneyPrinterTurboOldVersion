@@ -75,6 +75,87 @@ class _SynchronizedConfig(dict):
             super().update(changes)
 
 
+def _environment_value(names):
+    """Find the first non-empty environment value, case-insensitively."""
+    environment = {key.upper(): value for key, value in os.environ.items()}
+    for name in names:
+        value = environment.get(name.upper(), "")
+        if value is not None and str(value).strip() != "":
+            return str(value).strip()
+    return None
+
+
+def _coerce_environment_value(raw_value, default_value):
+    """Convert a string environment value using the TOML value's type."""
+    if isinstance(default_value, bool):
+        normalized = raw_value.lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+        raise ValueError("expected a boolean")
+
+    if isinstance(default_value, int) and not isinstance(default_value, bool):
+        return int(raw_value)
+    if isinstance(default_value, float):
+        return float(raw_value)
+    if isinstance(default_value, (list, dict)):
+        parsed = toml.loads(f"value = {raw_value}").get("value")
+        if not isinstance(parsed, type(default_value)):
+            raise ValueError(f"expected {type(default_value).__name__}")
+        return parsed
+
+    if raw_value.startswith(('"', "'")) and raw_value.endswith(
+        ('"', "'")
+    ):
+        return raw_value[1:-1]
+    return raw_value
+
+
+def _apply_environment_overrides(config_data):
+    """Overlay non-empty MPT/Coolify environment values on TOML settings.
+
+    Supported names are, for example, MPT_APP_ENDPOINT, APP_ENDPOINT,
+    MPT_ENDPOINT, and ENDPOINT. Names are matched case-insensitively. Empty
+    variables are ignored so the existing TOML value remains the fallback.
+    """
+    for section_name, section_values in list(config_data.items()):
+        if not isinstance(section_values, dict):
+            continue
+        for key, default_value in list(section_values.items()):
+            names = [
+                f"MPT_{section_name}_{key}",
+                f"{section_name}_{key}",
+            ]
+            if section_name == "app":
+                names.extend([f"MPT_{key}", key])
+            raw_value = _environment_value(names)
+            if raw_value is None:
+                continue
+            try:
+                section_values[key] = _coerce_environment_value(
+                    raw_value, default_value
+                )
+            except (TypeError, ValueError, toml.TomlDecodeError) as exc:
+                logger.warning(
+                    f"ignoring invalid environment value for {section_name}.{key}: {exc}"
+                )
+
+    root_defaults = {
+        key: value for key, value in config_data.items() if not isinstance(value, dict)
+    }
+    for key, default_value in root_defaults.items():
+        raw_value = _environment_value([f"MPT_{key}", key])
+        if raw_value is None:
+            continue
+        try:
+            config_data[key] = _coerce_environment_value(raw_value, default_value)
+        except (TypeError, ValueError, toml.TomlDecodeError) as exc:
+            logger.warning(f"ignoring invalid environment value for {key}: {exc}")
+
+    return config_data
+
+
 @contextmanager
 def runtime_config_lock():
     """
@@ -291,8 +372,18 @@ def save_config():
                 os.remove(temp_path)
 
 
-_cfg = load_config()
+_cfg = _apply_environment_overrides(load_config())
 app = _SynchronizedConfig(_cfg.get("app", {}))
+_public_endpoint = (
+    os.getenv("MPT_PUBLIC_ENDPOINT")
+    or os.getenv("SERVICE_FQDN_API")
+    or os.getenv("SERVICE_URL_API")
+    or ""
+).strip().rstrip("/")
+if not app.get("endpoint") and _public_endpoint:
+    if "://" not in _public_endpoint:
+        _public_endpoint = f"https://{_public_endpoint}"
+    app["endpoint"] = _public_endpoint
 whisper = _cfg.get("whisper", {})
 proxy = _cfg.get("proxy", {})
 azure = _SynchronizedConfig(_cfg.get("azure", {}))
