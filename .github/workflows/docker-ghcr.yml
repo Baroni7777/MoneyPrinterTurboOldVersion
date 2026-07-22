@@ -9,7 +9,6 @@ on:
     paths-ignore:
       - "README*.md"
       - "docs/**"
-      - ".github/workflows/docker-ghcr.yml"
   workflow_dispatch:
 
 permissions:
