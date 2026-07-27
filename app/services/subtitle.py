@@ -171,6 +171,39 @@ def file_to_subtitles(filename):
     return times_texts
 
 
+def _srt_timestamp_to_seconds(timestamp: str) -> float:
+    hours, minutes, rest = timestamp.strip().split(":")
+    seconds, _, milliseconds = rest.partition(",")
+    return (
+        int(hours) * 3600
+        + int(minutes) * 60
+        + int(seconds)
+        + int(milliseconds or 0) / 1000
+    )
+
+
+def file_to_time_ranges(filename) -> list[tuple[float, float]]:
+    """Narration segment boundaries, in seconds, from an SRT file.
+
+    Used to align the visual timeline with the spoken one: every clip cut can
+    then land on a subtitle boundary instead of an arbitrary fixed interval.
+    """
+
+    ranges: list[tuple[float, float]] = []
+    for _, times, _ in file_to_subtitles(filename):
+        found = re.findall(r"([0-9]+:[0-9]+:[0-9]+,[0-9]+)", times)
+        if len(found) != 2:
+            continue
+        try:
+            start = _srt_timestamp_to_seconds(found[0])
+            end = _srt_timestamp_to_seconds(found[1])
+        except (ValueError, AttributeError):
+            continue
+        if end > start:
+            ranges.append((start, end))
+    return ranges
+
+
 def levenshtein_distance(s1, s2):
     if len(s1) < len(s2):
         return levenshtein_distance(s2, s1)

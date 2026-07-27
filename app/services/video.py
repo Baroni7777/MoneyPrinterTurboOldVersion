@@ -1,5 +1,6 @@
 import itertools
 import io
+import math
 import os
 import random
 import gc
@@ -100,6 +101,120 @@ def _get_required_video_duration(audio_duration: float) -> float:
     轻量余量。函数独立出来，便于测试和后续按实际反馈调整余量大小。
     """
     return max(0.0, float(audio_duration) + _VIDEO_DURATION_SAFETY_MARGIN)
+
+
+def plan_clip_durations(
+    narration_segments: List[tuple], max_clip_duration: float
+) -> List[float]:
+    """Visual slot durations whose boundaries land on narration boundaries.
+
+    The old timeline cut a new clip every `max_clip_duration` seconds, which is
+    unrelated to when sentences actually start and end — so visuals drifted away
+    from what was being said. Here consecutive narration segments are packed into
+    slots that stay under the cap, and every slot ends exactly where a segment
+    ends. A segment longer than the cap is split into equal parts so it still
+    finishes on its own boundary.
+    """
+
+    cap = max(0.1, float(max_clip_duration))
+    plan: List[float] = []
+    pending = 0.0
+    for segment in narration_segments:
+        start, end = float(segment[0]), float(segment[1])
+        duration = end - start
+        if duration <= 0:
+            continue
+
+        if pending > 0 and pending + duration > cap:
+            plan.append(pending)
+            pending = 0.0
+
+        if duration > cap:
+            parts = math.ceil(duration / cap)
+            plan.extend([duration / parts] * parts)
+            continue
+
+        pending += duration
+
+    if pending > 0:
+        plan.append(pending)
+    return plan
+
+
+def _read_material_metadata(video_paths: List[str]) -> List[tuple]:
+    materials = []
+    for video_path in video_paths:
+        try:
+            clip = _open_video_clip_quietly(video_path)
+        except Exception as e:
+            logger.error(f"failed to open material {video_path}: {str(e)}")
+            continue
+        try:
+            if clip.duration and clip.duration > 0:
+                materials.append(
+                    (video_path, float(clip.duration), clip.size[0], clip.size[1])
+                )
+        finally:
+            close_clip(clip)
+    return materials
+
+
+def plan_subclips_for_narration(
+    video_paths: List[str],
+    duration_plan: List[float],
+    clip_speed: float = 1.0,
+) -> List[SubClippedVideoClip]:
+    """Lay the available footage onto the planned narration slots, in order.
+
+    Each slot is filled from the material pool until its duration is covered, so
+    a slot boundary always coincides with a narration boundary even when a single
+    material is too short to cover it. The pool is cycled when the footage is
+    shorter than the narration.
+    """
+
+    materials = _read_material_metadata(video_paths)
+    if not materials or not duration_plan:
+        return []
+
+    items: List[SubClippedVideoClip] = []
+    cursor = 0
+    offset = 0.0
+    for slot_duration in duration_plan:
+        # A slot is expressed in playback seconds; reading the source at a
+        # non-default speed needs proportionally more source footage.
+        remaining = slot_duration * clip_speed
+        exhausted_passes = 0
+        while remaining > 1e-3:
+            if cursor >= len(materials):
+                cursor = 0
+                offset = 0.0
+                exhausted_passes += 1
+                # Every material was consumed without covering the slot; the pool
+                # holds no usable footage, so stop instead of spinning forever.
+                if exhausted_passes > 1:
+                    break
+
+            path, duration, width, height = materials[cursor]
+            available = duration - offset
+            if available <= 1e-3:
+                cursor += 1
+                offset = 0.0
+                continue
+
+            take = min(available, remaining)
+            items.append(
+                SubClippedVideoClip(
+                    file_path=path,
+                    start_time=offset,
+                    end_time=offset + take,
+                    width=width,
+                    height=height,
+                    source_file_path=path,
+                )
+            )
+            offset += take
+            remaining -= take
+    return items
 
 
 def is_material_resolution_acceptable(width: int, height: int) -> bool:
@@ -545,6 +660,7 @@ def combine_videos(
     max_clip_duration: int = 5,
     threads: int = 2,
     clip_speed: float = 1.0,
+    narration_segments: List[tuple] | None = None,
 ) -> str:
     audio_clip = AudioFileClip(audio_file)
     try:
@@ -582,40 +698,67 @@ def combine_videos(
     processed_clips = []
     subclipped_items = []
     video_duration = 0
-    for video_path in video_paths:
-        clip = _open_video_clip_quietly(video_path)
-        clip_duration = clip.duration
-        clip_w, clip_h = clip.size
-        close_clip(clip)
-        
-        start_time = 0
 
-        while start_time < clip_duration:
-            end_time = min(start_time + source_clip_duration, clip_duration)
-
-            # 保留所有有效分段。
-            # 这样既不会丢掉“整段视频本身就短于 max_clip_duration”的素材，
-            # 也不会吞掉长视频最后剩下的一小段尾部内容。
-            if end_time > start_time:
-                subclipped_items.append(
-                    SubClippedVideoClip(
-                        file_path=video_path,
-                        start_time=start_time,
-                        end_time=end_time,
-                        width=clip_w,
-                        height=clip_h,
-                        source_file_path=video_path,
-                    )
-                )
-
-            start_time = end_time
-            if video_concat_mode.value == VideoConcatMode.sequential.value:
-                break
-
-    subclipped_items = _prioritize_unique_source_clips(
-        subclipped_items=subclipped_items,
-        concat_mode=video_concat_mode,
+    # When the narration timeline is known, cut on sentence boundaries instead of
+    # every `max_clip_duration` seconds, so the visuals stop drifting away from
+    # what is being said.
+    duration_plan = (
+        plan_clip_durations(narration_segments, max_clip_duration)
+        if narration_segments
+        else []
     )
+    if duration_plan:
+        logger.info(
+            f"aligning {len(duration_plan)} clip slots to narration boundaries "
+            f"(planned duration: {sum(duration_plan):.2f}s)"
+        )
+        subclipped_items = plan_subclips_for_narration(
+            video_paths=video_paths,
+            duration_plan=duration_plan,
+            clip_speed=normalized_clip_speed,
+        )
+        if not subclipped_items:
+            logger.warning(
+                "narration-aligned planning produced no clips, "
+                "falling back to fixed-length slicing"
+            )
+
+    narration_aligned = bool(subclipped_items)
+    if not narration_aligned:
+        for video_path in video_paths:
+            clip = _open_video_clip_quietly(video_path)
+            clip_duration = clip.duration
+            clip_w, clip_h = clip.size
+            close_clip(clip)
+
+            start_time = 0
+
+            while start_time < clip_duration:
+                end_time = min(start_time + source_clip_duration, clip_duration)
+
+                # 保留所有有效分段。
+                # 这样既不会丢掉“整段视频本身就短于 max_clip_duration”的素材，
+                # 也不会吞掉长视频最后剩下的一小段尾部内容。
+                if end_time > start_time:
+                    subclipped_items.append(
+                        SubClippedVideoClip(
+                            file_path=video_path,
+                            start_time=start_time,
+                            end_time=end_time,
+                            width=clip_w,
+                            height=clip_h,
+                            source_file_path=video_path,
+                        )
+                    )
+
+                start_time = end_time
+                if video_concat_mode.value == VideoConcatMode.sequential.value:
+                    break
+
+        subclipped_items = _prioritize_unique_source_clips(
+            subclipped_items=subclipped_items,
+            concat_mode=video_concat_mode,
+        )
         
     logger.debug(f"total subclipped items: {len(subclipped_items)}")
     

@@ -1716,6 +1716,37 @@ def _get_audio_duration_from_submaker(sub_maker: SubMaker):
         return 0.0
     return legacy_offsets[-1][1] / 10000000
 
+def get_narration_segments(sub_maker) -> list:
+    """Spoken segment boundaries in seconds, as (start, end) pairs.
+
+    Lets the video timeline cut on sentence boundaries instead of a fixed
+    interval. Supports both the edge_tts 7.x `cues` structure and the legacy
+    `offset` list the other TTS providers fill in.
+    """
+
+    if sub_maker is None:
+        return []
+
+    segments = []
+    cues = getattr(sub_maker, "cues", None)
+    if cues:
+        for cue in cues:
+            start = cue.start.total_seconds()
+            end = cue.end.total_seconds()
+            if end > start:
+                segments.append((start, end))
+        return segments
+
+    for offset in getattr(sub_maker, "offset", []) or []:
+        try:
+            start, end = offset[0] / 10000000, offset[1] / 10000000
+        except (TypeError, IndexError, ZeroDivisionError):
+            continue
+        if end > start:
+            segments.append((start, end))
+    return segments
+
+
 def _get_audio_duration_from_file(audio_file: str) -> float:
     """
     获取音频文件时长（支持 mp3/m4a/wav/aac 等 ffmpeg 可解码的格式）

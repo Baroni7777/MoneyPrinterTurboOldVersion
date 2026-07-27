@@ -607,8 +607,29 @@ def get_video_materials(task_id, params, video_terms, audio_duration):
         return downloaded_videos
 
 
+def resolve_narration_segments(subtitle_path: str, sub_maker) -> list:
+    """Spoken segment boundaries used to align clip cuts with the narration.
+
+    The subtitle file is preferred because it is the timeline the viewer
+    actually sees (and is the only source available when a custom audio file is
+    transcribed by Whisper). The TTS `sub_maker` covers the case where subtitles
+    are disabled or failed to be written.
+    """
+
+    segments = subtitle.file_to_time_ranges(subtitle_path)
+    if segments:
+        return segments
+    return voice.get_narration_segments(sub_maker)
+
+
 def generate_final_videos(
-    task_id, params, downloaded_videos, audio_file, subtitle_path, audio_duration
+    task_id,
+    params,
+    downloaded_videos,
+    audio_file,
+    subtitle_path,
+    audio_duration,
+    narration_segments=None,
 ):
     final_video_paths = []
     combined_video_paths = []
@@ -645,6 +666,7 @@ def generate_final_videos(
             max_clip_duration=params.video_clip_duration,
             threads=params.n_threads,
             clip_speed=params.video_clip_speed,
+            narration_segments=narration_segments,
         )
 
         _progress += 50 / params.video_count / 2
@@ -1205,6 +1227,7 @@ def _run_pipeline(
         audio_file,
         subtitle_path,
         audio_duration,
+        narration_segments=resolve_narration_segments(subtitle_path, sub_maker),
     )
 
     if not final_video_paths:
