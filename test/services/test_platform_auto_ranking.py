@@ -136,6 +136,87 @@ def test_choose_clip_returns_none_without_candidates(monkeypatch):
     assert platform_auto_ranking.choose_clip("Praias", "Ilha", []) is None
 
 
+def test_choose_clip_falls_back_to_gemini_when_twelvelabs_is_off(monkeypatch):
+    monkeypatch.setattr(platform_auto_ranking.twelvelabs, "is_enabled", lambda: False)
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "is_enabled", lambda: True)
+    scores = {"/tmp/a.mp4": "4", "/tmp/b.mp4": "9"}
+    monkeypatch.setattr(
+        platform_auto_ranking.gemini_video,
+        "analyze_clip",
+        lambda path, prompt="": scores[path],
+    )
+    downloaded = []
+
+    def downloader(candidate):
+        downloaded.append(candidate.url)
+        return f"/tmp/{candidate.url[-5:]}"
+
+    candidates = [_material("https://x/a.mp4"), _material("https://x/b.mp4")]
+
+    chosen = platform_auto_ranking.choose_clip(
+        "Praias", "Ilha", candidates, downloader=downloader
+    )
+
+    assert chosen.url == "https://x/b.mp4"
+    # Gemini cannot read a URL, so every candidate had to be fetched first.
+    assert downloaded == ["https://x/a.mp4", "https://x/b.mp4"]
+
+
+def test_twelvelabs_takes_precedence_over_gemini(monkeypatch):
+    monkeypatch.setattr(platform_auto_ranking.twelvelabs, "is_enabled", lambda: True)
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "is_enabled", lambda: True)
+    monkeypatch.setattr(
+        platform_auto_ranking.twelvelabs, "analyze_clip", lambda url, prompt="": "5"
+    )
+
+    def fail(*_a, **_k):
+        raise AssertionError("Gemini must not run while TwelveLabs is enabled")
+
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "analyze_clip", fail)
+
+    chosen = platform_auto_ranking.choose_clip(
+        "Praias", "Ilha", [_material("https://x/a.mp4")], downloader=fail
+    )
+
+    assert chosen.url == "https://x/a.mp4"
+
+
+def test_gemini_is_skipped_without_a_downloader(monkeypatch):
+    monkeypatch.setattr(platform_auto_ranking.twelvelabs, "is_enabled", lambda: False)
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "is_enabled", lambda: True)
+
+    def fail(*_a, **_k):
+        raise AssertionError("Gemini needs a local file, so it must not run here")
+
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "analyze_clip", fail)
+    candidates = [_material("https://x/a.mp4"), _material("https://x/b.mp4")]
+
+    assert platform_auto_ranking.choose_clip("Praias", "Ilha", candidates) is candidates[0]
+
+
+def test_gemini_skips_candidates_that_fail_to_download(monkeypatch):
+    monkeypatch.setattr(platform_auto_ranking.twelvelabs, "is_enabled", lambda: False)
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "is_enabled", lambda: True)
+    analyzed = []
+
+    def analyze(path, prompt=""):
+        analyzed.append(path)
+        return "8"
+
+    monkeypatch.setattr(platform_auto_ranking.gemini_video, "analyze_clip", analyze)
+    candidates = [_material("https://x/a.mp4"), _material("https://x/b.mp4")]
+
+    chosen = platform_auto_ranking.choose_clip(
+        "Praias",
+        "Ilha",
+        candidates,
+        downloader=lambda c: "" if c.url.endswith("a.mp4") else "/tmp/b.mp4",
+    )
+
+    assert analyzed == ["/tmp/b.mp4"]
+    assert chosen.url == "https://x/b.mp4"
+
+
 def test_analysis_url_resolves_social_page_to_media_url(monkeypatch):
     monkeypatch.setattr(
         platform_auto_ranking.social_sources,

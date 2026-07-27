@@ -22,7 +22,7 @@ from sqlalchemy.orm.attributes import flag_modified
 
 from app.database.models import Asset, Generation
 from app.models.schema import MaterialInfo, VideoAspect
-from app.services import llm, material, social_sources, twelvelabs
+from app.services import gemini_video, llm, material, social_sources, twelvelabs
 from app.services.platform_ranking import RankingStageError
 from app.utils import utils
 
@@ -168,34 +168,66 @@ def _analysis_url(candidate: MaterialInfo) -> str | None:
     return candidate.url
 
 
+def _score_with_twelvelabs(candidate: MaterialInfo, prompt: str) -> float | None:
+    analysis_url = _analysis_url(candidate)
+    if not analysis_url:
+        return None
+    return _parse_score(twelvelabs.analyze_clip(analysis_url, prompt=prompt))
+
+
+def _score_with_gemini(
+    candidate: MaterialInfo, prompt: str, downloader
+) -> float | None:
+    # Gemini has no URL input for video: the clip has to be uploaded, so it must
+    # be on disk first. Downloads are cached by URL, so the winning candidate is
+    # not fetched twice.
+    path = downloader(candidate)
+    if not path:
+        return None
+    return _parse_score(gemini_video.analyze_clip(path, prompt=prompt))
+
+
 def choose_clip(
-    video_subject: str, item_title: str, candidates: list[MaterialInfo]
+    video_subject: str,
+    item_title: str,
+    candidates: list[MaterialInfo],
+    downloader=None,
 ) -> MaterialInfo | None:
     """Pick the candidate that best depicts `item_title`.
 
-    Uses TwelveLabs Pegasus to actually watch each candidate when it is
-    configured; otherwise falls back to the provider's own ranking (first hit),
-    so the pipeline still works without the optional integration.
+    Preference order:
+      1. TwelveLabs Pegasus — watches the candidate straight from its URL, so
+         rejected clips are never downloaded;
+      2. Gemini — needs the clip uploaded, so it only runs when `downloader` is
+         given (the ranking pipeline passes one);
+      3. the provider's own ranking (first hit), when no analyser is configured.
     """
 
     if not candidates:
         return None
-    if not twelvelabs.is_enabled():
+
+    use_twelvelabs = twelvelabs.is_enabled()
+    use_gemini = not use_twelvelabs and gemini_video.is_enabled() and downloader
+
+    if not use_twelvelabs and not use_gemini:
         return candidates[0]
 
+    analyser = "TwelveLabs" if use_twelvelabs else "Gemini"
     prompt = (
         f'Rate from 0 to 10 how well this video visually represents "{item_title}" '
         f'in a ranking video about "{video_subject}". Reply with the number only.'
     )
     best: tuple[float, MaterialInfo] | None = None
     for candidate in candidates[:MAX_CANDIDATES_PER_ITEM]:
-        analysis_url = _analysis_url(candidate)
-        if not analysis_url:
-            continue
-        score = _parse_score(twelvelabs.analyze_clip(analysis_url, prompt=prompt))
+        if use_twelvelabs:
+            score = _score_with_twelvelabs(candidate, prompt)
+        else:
+            score = _score_with_gemini(candidate, prompt, downloader)
         if score is None:
             continue
-        logger.info(f"clip score {score} for '{item_title}': {candidate.url}")
+        logger.info(
+            f"{analyser} scored {score} for '{item_title}': {candidate.url}"
+        )
         if best is None or score > best[0]:
             best = (score, candidate)
 
@@ -268,7 +300,14 @@ def prepare_auto_ranking_items(
             )
             if candidate.url not in used_urls
         ]
-        chosen = choose_clip(generation.video_subject, item["title"], candidates)
+        chosen = choose_clip(
+            generation.video_subject,
+            item["title"],
+            candidates,
+            downloader=lambda candidate: _download_candidate(
+                candidate, download_dir, clip_duration
+            ),
+        )
         if chosen is None:
             logger.warning(
                 f"no stock footage found for '{item['title']}' "
