@@ -2,6 +2,18 @@ x-common-volumes: &common-volumes
   - ./:/MoneyPrinterTurbo
 
 services:
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: "moneyprinterturbo-frontend"
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      INTERNAL_API_URL: http://api:8080
+    depends_on:
+      - api
+    restart: always
   webui:
     build:
       context: .
@@ -19,6 +31,9 @@ services:
     container_name: "moneyprinterturbo-api"
     ports:
       - "127.0.0.1:8080:8080"
-    command: [ "python3", "main.py" ]
+    command: [ "sh", "-c", "alembic upgrade head && python3 main.py" ]
+    environment:
+      MPT_DATABASE_URL: ${MPT_DATABASE_URL:-sqlite:////MoneyPrinterTurbo/storage/moneyprinterturbo.db}
+      MPT_AUTH_COOKIE_SECURE: ${MPT_AUTH_COOKIE_SECURE:-false}
     volumes: *common-volumes
     restart: always

@@ -2,6 +2,26 @@ x-common-volumes: &common-volumes
   - ./storage:/MoneyPrinterTurbo/storage
 
 services:
+  redis:
+    image: redis:7-alpine
+    command: [ "redis-server", "--appendonly", "yes" ]
+    expose:
+      - "6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+
+  frontend:
+    image: ghcr.io/baroni7777/moneyprinterturbo-studio:latest
+    pull_policy: always
+    container_name: "moneyprinterturbo-frontend"
+    expose:
+      - "3000"
+    environment:
+      INTERNAL_API_URL: http://api:8080
+    depends_on:
+      - api
+    restart: always
   webui:
     image: ghcr.io/baroni7777/moneyprinterturbo-old-version:latest
     pull_policy: always
@@ -12,6 +32,12 @@ services:
       - "8501"
     command: [ "streamlit", "run", "./webui/Main.py", "--server.address=0.0.0.0", "--server.port=8501", "--browser.serverAddress=127.0.0.1", "--server.enableCORS=True", "--browser.gatherUsageStats=False", "--client.toolbarMode=minimal", "--logger.hideWelcomeMessage=True", "--server.showEmailPrompt=False" ]
     volumes: *common-volumes
+    environment:
+      MPT_APP_ENABLE_REDIS: "true"
+      MPT_APP_REDIS_HOST: redis
+      MPT_APP_REDIS_PORT: "6379"
+    depends_on:
+      - redis
     restart: always
   api:
     image: ghcr.io/baroni7777/moneyprinterturbo-old-version:latest
@@ -19,6 +45,17 @@ services:
     container_name: "moneyprinterturbo-api"
     expose:
       - "8080"
-    command: [ "python3", "main.py" ]
+    command: [ "sh", "-c", "alembic upgrade head && python3 main.py" ]
+    environment:
+      MPT_DATABASE_URL: ${MPT_DATABASE_URL:-sqlite:////MoneyPrinterTurbo/storage/moneyprinterturbo.db}
+      MPT_AUTH_COOKIE_SECURE: ${MPT_AUTH_COOKIE_SECURE:-true}
+      MPT_APP_ENABLE_REDIS: "true"
+      MPT_APP_REDIS_HOST: redis
+      MPT_APP_REDIS_PORT: "6379"
     volumes: *common-volumes
+    depends_on:
+      - redis
     restart: always
+
+volumes:
+  redis-data:

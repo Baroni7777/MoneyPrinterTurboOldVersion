@@ -24,8 +24,16 @@ async def application_lifespan(_: FastAPI):
     # 跨平台发布由当前进程线程池执行，不会在服务重启后恢复。启动时把 Redis
     # 中确认已失去执行进程的活动状态收敛为失败，避免任务永久无法删除。
     from app.services import task as task_service
+    from app.services import platform_worker
+    from app.controllers.v1.video import task_manager
 
     task_service.recover_interrupted_cross_posts()
+    resume_queued_tasks = getattr(task_manager, "resume_queued_tasks", None)
+    if callable(resume_queued_tasks):
+        resume_queued_tasks()
+    interrupted = platform_worker.reconcile_interrupted_generations()
+    if interrupted:
+        logger.warning(f"marked {interrupted} interrupted platform generations as failed")
     try:
         yield
     finally:
@@ -76,7 +84,9 @@ origins = cors_allowed_origins_str.split(",") if cors_allowed_origins_str else [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,
+    # Credentialed cross-origin requests are only enabled when production
+    # explicitly lists trusted origins. Same-origin cookies continue to work.
+    allow_credentials=bool(cors_allowed_origins_str),
     allow_methods=["*"],
     allow_headers=["*"],
 )

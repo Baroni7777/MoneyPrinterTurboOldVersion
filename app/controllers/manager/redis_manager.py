@@ -5,10 +5,11 @@ import redis
 
 from app.controllers.manager.base_manager import TaskManager
 from app.models.schema import VideoParams
-from app.services import task as tm
+from app.services import platform_worker, task as tm
 
 FUNC_MAP = {
     "start": tm.start,
+    "execute_generation": platform_worker.execute_generation,
     # 'start_test': tm.start_test
 }
 
@@ -22,6 +23,11 @@ class RedisTaskManager(TaskManager):
     ):
         self.redis_client = redis.Redis.from_url(redis_url)
         super().__init__(max_concurrent_tasks, max_queued_tasks=max_queued_tasks)
+
+    def resume_queued_tasks(self) -> None:
+        """Start the next persisted task after application startup."""
+
+        self.check_queue()
 
     def create_queue(self):
         return "task_queue"

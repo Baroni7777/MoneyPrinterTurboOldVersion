@@ -50,6 +50,29 @@ pixabay_api_keys = []
 # Register at https://coverr.co/developers?ctx=header_navigation
 coverr_api_keys = []
 
+# YouTube / TikTok as footage sources for the automatic ranking pipeline.
+# Enable per generation with video_source = "youtube" or "tiktok".
+# Install the optional dependency with: uv sync --extra social-sources
+#
+# WARNING: downloading from YouTube and TikTok violates their terms of service,
+# and republishing third-party clips in a compilation is generally copyright
+# infringement — expect Content ID claims and channel strikes. Enable only for
+# content you own or that is licensed for reuse.
+#
+# YouTube refuses unauthenticated downloads with "Sign in to confirm you're not
+# a bot", so one of these is required for the youtube source to work at all
+# (searching works without them). Point social_cookies_file at a Netscape-format
+# cookies.txt export, or name a local browser to read cookies from — note that
+# doing so links the download activity to that logged-in account.
+social_cookies_file = ""
+# social_cookies_from_browser = "chrome"   # chrome, firefox, edge, brave, ...
+
+# How many search results to consider per ranking item.
+social_search_results = 8
+# Candidates longer than this (seconds) are discarded: a ranking slot only uses
+# its first seconds, so feature-length hits are bad and expensive candidates.
+social_max_duration = 900
+
 # Optional TwelveLabs integration for semantic material ranking and video QA.
 # Install the optional dependency with: uv sync --extra twelvelabs
 # Create an API key at https://playground.twelvelabs.io/

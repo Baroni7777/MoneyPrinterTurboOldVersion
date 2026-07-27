@@ -60,6 +60,12 @@ class TaskManager:
     def run_task(self, func: Callable, *args: Any, **kwargs: Any):
         try:
             func(*args, **kwargs)  # call the function here, passing *args and **kwargs.
+        except Exception as exc:
+            function_name = getattr(func, "__name__", func.__class__.__name__)
+            logger.exception(
+                f"background task crashed: {function_name}, error: {exc}"
+            )
+            raise
         finally:
             self.task_done()
 

@@ -34,6 +34,10 @@ dependencies = [
     "audioop-lts==0.2.2; python_version >= '3.13'",
     "litellm==1.86.2",
     "google-genai==2.11.0",
+    "sqlalchemy>=2.0,<3.0",
+    "alembic>=1.16,<2.0",
+    "psycopg[binary]>=3.2,<4.0",
+    "argon2-cffi>=25.1,<26.0",
 ]
 
 [project.optional-dependencies]
@@ -42,6 +46,13 @@ dependencies = [
 # with `uv sync --extra twelvelabs`.
 twelvelabs = [
     "twelvelabs>=1.2.8",
+]
+# Optional YouTube/TikTok footage sources for the automatic ranking pipeline.
+# Only needed when `video_source` is set to "youtube" or "tiktok"; install with
+# `uv sync --extra social-sources`. Note that downloading from these platforms
+# is against their terms of service.
+social-sources = [
+    "yt-dlp>=2026.7.4",
 ]
 
 [dependency-groups]

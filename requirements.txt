@@ -20,3 +20,7 @@ socksio==1.0.0
 pydub==0.25.1
 audioop-lts==0.2.2; python_version >= "3.13"
 litellm==1.86.2
+sqlalchemy>=2.0,<3.0
+alembic>=1.16,<2.0
+psycopg[binary]>=3.2,<4.0
+argon2-cffi>=25.1,<26.0

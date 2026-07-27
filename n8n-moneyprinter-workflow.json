@@ -1,0 +1,349 @@
+{
+  "name": "MoneyPrinterTurbo - Geração completa de vídeo",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1260, 420],
+      "id": "1b888de3-28c3-405b-a384-81fe0fb48bf8",
+      "name": "Executar workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2e2baa41-c4ee-4924-8cbd-04260a20418d",
+              "name": "url_api",
+              "value": "https://vid.api.baronialexandre.site",
+              "type": "string"
+            },
+            {
+              "id": "f4dfa4a6-2340-4726-b272-18912c330f0e",
+              "name": "tema_video",
+              "value": "5 hábitos que melhoram a produtividade",
+              "type": "string"
+            },
+            {
+              "id": "c114c079-8964-4952-96e7-d27ec0e139e5",
+              "name": "idioma",
+              "value": "pt-BR",
+              "type": "string"
+            },
+            {
+              "id": "1147b24c-df8f-4236-ad7d-91bfcb5ce8a9",
+              "name": "quantidade_paragrafos",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "6ba076f2-6b5b-4bc0-a039-cf57c866375a",
+              "name": "voz",
+              "value": "gemini:Zephyr-Female",
+              "type": "string"
+            },
+            {
+              "id": "e0fab881-a4eb-4141-a879-5e813b261a47",
+              "name": "combinar_materiais_com_roteiro",
+              "value": false,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-1040, 420],
+      "id": "c4acabf0-b67e-444a-8e5f-0bb7894aba6a",
+      "name": "Configuração"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuração').item.json.url_api }}/api/v1/scripts",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  video_subject: $('Configuração').item.json.tema_video,\n  video_language: $('Configuração').item.json.idioma,\n  paragraph_number: $('Configuração').item.json.quantidade_paragrafos,\n  video_script_prompt: '',\n  custom_system_prompt: ''\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-800, 420],
+      "id": "6db3fcb5-d55c-43e7-948b-f32810226c74",
+      "name": "Gerar roteiro"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuração').item.json.url_api }}/api/v1/terms",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  video_subject: $('Configuração').item.json.tema_video,\n  video_script: $('Gerar roteiro').item.json.data.video_script,\n  amount: $('Configuração').item.json.combinar_materiais_com_roteiro ? 8 : 5,\n  match_materials_to_script: $('Configuração').item.json.combinar_materiais_com_roteiro\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-560, 420],
+      "id": "ee417118-ce44-4762-be9b-e3fc22662975",
+      "name": "Gerar termos"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Configuração').item.json.url_api }}/api/v1/videos",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  video_subject: $('Configuração').item.json.tema_video,\n  video_script: $('Gerar roteiro').item.json.data.video_script,\n  video_terms: $('Gerar termos').item.json.data.video_terms,\n  video_language: $('Configuração').item.json.idioma,\n  video_aspect: '9:16',\n  video_source: 'pexels',\n  video_count: 1,\n  video_concat_mode: 'random',\n  video_transition_mode: null,\n  video_clip_duration: 5,\n  video_clip_speed: 1,\n  match_materials_to_script: $('Configuração').item.json.combinar_materiais_com_roteiro,\n  voice_name: $('Configuração').item.json.voz,\n  voice_volume: 1,\n  voice_rate: 1,\n  bgm_type: 'random',\n  bgm_file: '',\n  bgm_volume: 0.2,\n  subtitle_enabled: true,\n  subtitle_position: 'bottom',\n  custom_position: 70,\n  font_name: 'STHeitiMedium.ttc',\n  text_fore_color: '#FFFFFF',\n  text_background_color: false,\n  rounded_subtitle_background: false,\n  font_size: 60,\n  stroke_color: '#000000',\n  stroke_width: 1.5,\n  n_threads: 2,\n  paragraph_number: $('Configuração').item.json.quantidade_paragrafos\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [-320, 420],
+      "id": "921834ab-8073-42b9-a1e9-2a4135a62915",
+      "name": "Criar vídeo"
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 20,
+        "unit": "seconds"
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [-80, 420],
+      "id": "08760971-a5e5-481e-88f3-55b7b5dd107a",
+      "name": "Aguardar 20 segundos",
+      "webhookId": "9f05b4a9-b773-4e40-949a-5da29029e89d"
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Configuração').item.json.url_api }}/api/v1/tasks/{{ $('Criar vídeo').item.json.data.task_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [160, 420],
+      "id": "0727ac28-9a53-4a46-a3a1-6a6394451272",
+      "name": "Consultar tarefa"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "36a9c0e8-a938-452c-8ddf-30e3f0e39055",
+                    "leftValue": "={{ $json.data.state }}",
+                    "rightValue": 1,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "concluído"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "3ed6e8f1-05cb-4d08-ad58-f42e5f5170df",
+                    "leftValue": "={{ $json.data.state }}",
+                    "rightValue": 4,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "processando"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d823bc1d-a180-40a7-b02e-c887898b5663",
+                    "leftValue": "={{ $json.data.state }}",
+                    "rightValue": -1,
+                    "operator": {
+                      "type": "number",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "erro"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [400, 420],
+      "id": "1d05d0ab-0579-459d-bcd8-47b5fa9adc8b",
+      "name": "Verificar estado"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9da9d17a-a584-4faf-a22d-ae21fa9121a5",
+              "name": "task_id",
+              "value": "={{ $json.data.task_id }}",
+              "type": "string"
+            },
+            {
+              "id": "271f218d-32c7-47a3-98c7-7a69c7ac2ddb",
+              "name": "video_url",
+              "value": "={{ $json.data.videos[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "588a3d46-639f-40d8-8fd2-28427f262017",
+              "name": "roteiro",
+              "value": "={{ $('Gerar roteiro').item.json.data.video_script }}",
+              "type": "string"
+            },
+            {
+              "id": "5db97550-3e2e-4bbe-a514-22de9bb19f96",
+              "name": "termos",
+              "value": "={{ $('Gerar termos').item.json.data.video_terms }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 300],
+      "id": "2cb901a8-db78-49b2-836e-434c879e89b9",
+      "name": "Resultado"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.video_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "video"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [900, 300],
+      "id": "40310505-c24e-4300-8ade-ff1bba4f1c9a",
+      "name": "Baixar vídeo"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed4d2d37-1b18-4dfc-a182-ad6ecee3d046",
+              "name": "task_id",
+              "value": "={{ $json.data.task_id }}",
+              "type": "string"
+            },
+            {
+              "id": "b1bd2b34-eaf0-485d-b6c9-80bfbdfb99dc",
+              "name": "failed_stage",
+              "value": "={{ $json.data.failed_stage }}",
+              "type": "string"
+            },
+            {
+              "id": "39d9cac0-87fa-4a08-bbf8-f5432952d6f1",
+              "name": "erro",
+              "value": "={{ $json.data.error }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [660, 560],
+      "id": "0dee6cca-dbce-4e13-8516-0150c4ee3776",
+      "name": "Erro na geração"
+    }
+  ],
+  "connections": {
+    "Executar workflow": {
+      "main": [[{"node": "Configuração", "type": "main", "index": 0}]]
+    },
+    "Configuração": {
+      "main": [[{"node": "Gerar roteiro", "type": "main", "index": 0}]]
+    },
+    "Gerar roteiro": {
+      "main": [[{"node": "Gerar termos", "type": "main", "index": 0}]]
+    },
+    "Gerar termos": {
+      "main": [[{"node": "Criar vídeo", "type": "main", "index": 0}]]
+    },
+    "Criar vídeo": {
+      "main": [[{"node": "Aguardar 20 segundos", "type": "main", "index": 0}]]
+    },
+    "Aguardar 20 segundos": {
+      "main": [[{"node": "Consultar tarefa", "type": "main", "index": 0}]]
+    },
+    "Consultar tarefa": {
+      "main": [[{"node": "Verificar estado", "type": "main", "index": 0}]]
+    },
+    "Verificar estado": {
+      "main": [
+        [{"node": "Resultado", "type": "main", "index": 0}],
+        [{"node": "Aguardar 20 segundos", "type": "main", "index": 0}],
+        [{"node": "Erro na geração", "type": "main", "index": 0}]
+      ]
+    },
+    "Resultado": {
+      "main": [[{"node": "Baixar vídeo", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "841085bc-d25a-4234-a692-7a751d7088c0",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

@@ -27,6 +27,17 @@ node_modules
 
 venv/
 .venv
+.uv-cache/
+
+# Next.js build output. The frontend image builds this inside Docker
+# (frontend/Dockerfile), so the artifacts must never be committed.
+/frontend/.next/
+/frontend/tsconfig.tsbuildinfo
+
+# Third-party clone of https://github.com/gcui-art/suno-api kept in the working
+# tree for local use. It carries its own .git and is not part of any compose
+# service, so it is deliberately not tracked here.
+/suno-api/
 
 # Debug and test files
 CLAUDE.md
