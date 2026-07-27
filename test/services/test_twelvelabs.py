@@ -119,8 +119,8 @@ class TestTwelveLabsService(unittest.TestCase):
         config.app["twelvelabs_api_keys"] = ["tlk_test"]
 
         # analyze_clip() lazily imports `twelvelabs.types.VideoContext_Url`.
-        # The SDK is an optional extra, so the deterministic unit test must pass
-        # even without `uv sync --extra twelvelabs`. Inject lightweight stub
+        # The SDK ships with the project, but this deterministic unit test must
+        # also pass on a trimmed install that drops it. Inject lightweight stub
         # modules so the internal import resolves; the mocked _client below does
         # the rest. (When the real SDK *is* installed, these stubs are ignored.)
         stub_types = type(sys)("twelvelabs.types")
