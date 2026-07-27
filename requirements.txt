@@ -24,3 +24,9 @@ sqlalchemy>=2.0,<3.0
 alembic>=1.16,<2.0
 psycopg[binary]>=3.2,<4.0
 argon2-cffi>=25.1,<26.0
+# Declared as optional extras in pyproject.toml, but shipped in the image so the
+# published deployment can use them. Both stay inert until configured:
+# twelvelabs only runs when twelvelabs_api_keys is set (it is billed per call),
+# and yt-dlp only when video_source is "youtube" or "tiktok".
+twelvelabs>=1.2.8
+yt-dlp>=2026.7.4

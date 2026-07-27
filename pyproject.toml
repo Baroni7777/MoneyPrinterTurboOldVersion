@@ -38,20 +38,11 @@ dependencies = [
     "alembic>=1.16,<2.0",
     "psycopg[binary]>=3.2,<4.0",
     "argon2-cffi>=25.1,<26.0",
-]
-
-[project.optional-dependencies]
-# Optional TwelveLabs (https://twelvelabs.io) video-understanding/embedding
-# integration. Only needed when `twelvelabs_api_keys` is configured; install
-# with `uv sync --extra twelvelabs`.
-twelvelabs = [
+    # Both features are opt-in at runtime, but the packages ship by default so a
+    # published deployment can turn them on with configuration alone.
+    # twelvelabs runs only when `twelvelabs_api_keys` is set (billed per call);
+    # yt-dlp only when `video_source` is "youtube" or "tiktok".
     "twelvelabs>=1.2.8",
-]
-# Optional YouTube/TikTok footage sources for the automatic ranking pipeline.
-# Only needed when `video_source` is set to "youtube" or "tiktok"; install with
-# `uv sync --extra social-sources`. Note that downloading from these platforms
-# is against their terms of service.
-social-sources = [
     "yt-dlp>=2026.7.4",
 ]
 

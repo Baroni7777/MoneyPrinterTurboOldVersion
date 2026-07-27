@@ -1657,15 +1657,9 @@ dependencies = [
     { name = "sqlalchemy" },
     { name = "streamlit" },
     { name = "streamlit-tour" },
-    { name = "uvicorn" },
-]
-
-[package.optional-dependencies]
-social-sources = [
-    { name = "yt-dlp" },
-]
-twelvelabs = [
     { name = "twelvelabs" },
+    { name = "uvicorn" },
+    { name = "yt-dlp" },
 ]
 
 [package.dev-dependencies]
@@ -1701,11 +1695,10 @@ requires-dist = [
     { name = "sqlalchemy", specifier = ">=2.0,<3.0" },
     { name = "streamlit", specifier = "==1.59.1" },
     { name = "streamlit-tour", specifier = "==1.1.0" },
-    { name = "twelvelabs", marker = "extra == 'twelvelabs'", specifier = ">=1.2.8" },
+    { name = "twelvelabs", specifier = ">=1.2.8" },
     { name = "uvicorn", specifier = "==0.32.1" },
-    { name = "yt-dlp", marker = "extra == 'social-sources'", specifier = ">=2026.7.4" },
+    { name = "yt-dlp", specifier = ">=2026.7.4" },
 ]
-provides-extras = ["twelvelabs", "social-sources"]
 
 [package.metadata.requires-dev]
 dev = [

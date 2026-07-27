@@ -1,5 +1,9 @@
+# A named volume, not a bind mount: Coolify recreates the project directory on
+# every deployment, so `./storage` would be wiped each redeploy — taking the
+# platform database (users, projects, generations) and every rendered video with
+# it. A named volume lives outside the project directory and survives.
 x-common-volumes: &common-volumes
-  - ./storage:/MoneyPrinterTurbo/storage
+  - storage-data:/MoneyPrinterTurbo/storage
 
 services:
   redis:
@@ -59,3 +63,4 @@ services:
 
 volumes:
   redis-data:
+  storage-data:

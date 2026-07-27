@@ -277,5 +277,5 @@ def test_missing_yt_dlp_raises_actionable_error(monkeypatch):
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
 
-    with pytest.raises(RuntimeError, match="social-sources"):
+    with pytest.raises(RuntimeError, match="yt-dlp"):
         social_sources._yt_dlp()

@@ -16,8 +16,8 @@ Legal note: YouTube and TikTok terms of service prohibit downloading, and
 republishing third-party clips in a compilation is generally copyright
 infringement. Enabling these sources is a deliberate choice by the operator.
 
-`yt-dlp` is imported lazily and is an optional dependency:
-    uv sync --extra social-sources
+`yt-dlp` ships with the project but is imported lazily, so a trimmed install
+that drops it still runs every other source.
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ def _yt_dlp():
     except ImportError as exc:  # noqa: TRY003
         raise RuntimeError(
             "yt-dlp is required for the youtube/tiktok sources. "
-            "Install it with: uv sync --extra social-sources"
+            "Install it with: pip install yt-dlp"
         ) from exc
     return yt_dlp
 

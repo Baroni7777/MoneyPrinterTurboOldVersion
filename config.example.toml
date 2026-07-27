@@ -52,7 +52,6 @@ coverr_api_keys = []
 
 # YouTube / TikTok as footage sources for the automatic ranking pipeline.
 # Enable per generation with video_source = "youtube" or "tiktok".
-# Install the optional dependency with: uv sync --extra social-sources
 #
 # WARNING: downloading from YouTube and TikTok violates their terms of service,
 # and republishing third-party clips in a compilation is generally copyright
@@ -74,7 +73,7 @@ social_search_results = 8
 social_max_duration = 900
 
 # Optional TwelveLabs integration for semantic material ranking and video QA.
-# Install the optional dependency with: uv sync --extra twelvelabs
+# Leaving this empty keeps the integration off; it is billed per call.
 # Create an API key at https://playground.twelvelabs.io/
 twelvelabs_api_keys = []
 # Reorder search terms using Marengo before downloading materials. This option
